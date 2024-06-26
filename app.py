@@ -5,7 +5,8 @@ from models.user import User
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your_secret_key"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"  # dev
+# app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud" # docker
 
 login_manager = LoginManager()
 db.init_app(app)
@@ -47,7 +48,7 @@ def create_user():
     password = data.get("password")
 
     if username and password:
-        new_user = User(username=username, password=password)
+        new_user = User(username=username, password=password, role="user")
         db.session.add(new_user)
         db.session.commit()
 
@@ -72,6 +73,9 @@ def read_user(user_id):
 def update_user(user_id):
     user = User.query.get(user_id)
 
+    if user_id != current_user.id and current_user.role == "user":
+        return jsonify({"message": "operation not permitted"}), 403
+
     if not user:
         return jsonify({"message": "user not found"}), 404
 
@@ -90,6 +94,9 @@ def update_user(user_id):
 @login_required
 def delete_user(user_id):
     user = User.query.get(user_id)
+
+    if current_user.role != "admin":
+        return jsonify({"message": "operation not permitted"}), 403
 
     if user_id != current_user.id:
         return jsonify({"message": "deletion not permitted"}), 403
