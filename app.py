@@ -1,3 +1,4 @@
+import bcrypt
 from flask import Flask, jsonify, request
 from database import db
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
@@ -6,7 +7,7 @@ from models.user import User
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your_secret_key"
 # app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud" # docker
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:admin123@127.0.0.1:3306/flask-crud"  # docker
 
 login_manager = LoginManager()
 db.init_app(app)
@@ -27,7 +28,10 @@ def login():
 
     if username and password:
         user = User.query.filter_by(username=username).first()
-        if user and user.password == password:
+
+        if user and bcrypt.checkpw(
+                str.encode(password),
+                str.encode(user.password)):
             login_user(user)
             return jsonify({"message": "authentication successful"})
 
@@ -48,7 +52,12 @@ def create_user():
     password = data.get("password")
 
     if username and password:
-        new_user = User(username=username, password=password, role="user")
+        password_hashed = bcrypt.hashpw(str.encode(password), bcrypt.gensalt())
+        new_user = User(
+            username=username,
+            password=password_hashed,
+            role="user"
+        )
         db.session.add(new_user)
         db.session.commit()
 
@@ -98,7 +107,7 @@ def delete_user(user_id):
     if current_user.role != "admin":
         return jsonify({"message": "operation not permitted"}), 403
 
-    if user_id != current_user.id:
+    if user_id == current_user.id:
         return jsonify({"message": "deletion not permitted"}), 403
 
     if user:
